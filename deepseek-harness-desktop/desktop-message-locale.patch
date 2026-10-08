@@ -1,0 +1,107 @@
+--- a/apps/desktop/src/login-shell-environment.ts
++++ b/apps/desktop/src/login-shell-environment.ts
+@@ -15,6 +15,19 @@
+ const SHELL_SESSION_KEYS = new Set(['PWD', 'OLDPWD', 'SHLVL', '_', ...Object.keys(PROBE_ENVIRONMENT)])
+ /** Desktop resolves paths such as `DSH_HOME` before the read, so the Host keeps the same inherited values. */
+ const LAUNCHER_OWNED_PREFIXES = ['DSH_', 'ELECTRON_'] as const
++/**
++ * Variables Desktop pins on the Host environment whatever the login shell reported. Applied last, so
++ * on the POSIX merge path a value the user exported cannot take them back.
++ *
++ * `LC_MESSAGES=C` keeps libc and the coreutils printing their untranslated English diagnostics inside
++ * the Host and every confined tool command. DSH tells a refused file effect apart from an ordinary
++ * command failure by matching exact ASCII substrings of the child process's stderr, so a translated
++ * message locale makes every sandbox denial invisible: no `[sandbox: file access denied ...]` marker
++ * and no escalation prompt, leaving the model to guess why a write failed. Only the message catalogue
++ * is pinned -- `LC_CTYPE`, `LC_TIME`, collation and the application's own UI locale stay as the user
++ * configured them.
++ */
++const PINNED_ENVIRONMENT = { LC_MESSAGES: 'C' } as const
+ 
+ /** Validated login-shell read settings. */
+ export interface DesktopLoginShellConfig {
+@@ -102,6 +115,15 @@
+   return merged
+ }
+ 
++/**
++ * Apply {@link PINNED_ENVIRONMENT} to an environment about to become the Host's.
++ * @param environment - Environment Desktop inherited, or merged from the login shell.
++ * @returns A new environment with the pinned variables applied.
++ */
++function pinHostEnvironment(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
++  return { ...environment, ...PINNED_ENVIRONMENT }
++}
++
+ function readShell(
+   shell: string, base: NodeJS.ProcessEnv, cwd: string, timeoutMs: number, signal: AbortSignal | undefined,
+ ): Promise<Record<string, string> | string> {
+@@ -162,8 +184,9 @@
+ 
+ /**
+  * Read the user's login-shell environment once; Windows GUI launches already inherit the registry
+- * environment, so `win32` returns `base` unchanged. Never rejects: each failing candidate is
+- * recorded and the next one tried, and `base` is returned when all fail or the read is aborted.
++ * environment, so `win32` reads no shell. Never rejects: each failing candidate is recorded and the
++ * next one tried, and `base` is used when all fail or the read is aborted. Every path leaves through
++ * {@link pinHostEnvironment}, so the pinned message locale reaches the Host whichever branch ran.
+  * @param base - Environment Desktop inherited.
+  * @param config - Validated read settings.
+  * @param options - Platform, candidates, and cancellation.
+@@ -173,13 +196,13 @@
+   base: NodeJS.ProcessEnv, config: DesktopLoginShellConfig, options: DesktopLoginShellReadOptions = {},
+ ): Promise<DesktopLoginShellResult> {
+   const { platform = process.platform, shells = loginShellCandidates(), signal } = options
+-  if (platform === 'win32') return { environment: base, failures: [] }
++  if (platform === 'win32') return { environment: pinHostEnvironment(base), failures: [] }
+   const failures: DesktopLoginShellFailure[] = []
+   for (const shell of shells) {
+     const result = await readShell(shell, base, homedir(), config.timeoutMs, signal)
+-    if (typeof result !== 'string') return { environment: mergeLoginShellEnvironment(base, result), failures }
++    if (typeof result !== 'string') return { environment: pinHostEnvironment(mergeLoginShellEnvironment(base, result)), failures }
+     failures.push({ shell, reason: result })
+     if (result === 'aborted') break
+   }
+-  return { environment: base, failures }
++  return { environment: pinHostEnvironment(base), failures }
+ }
+--- a/apps/desktop/tests/login-shell-environment.spec.ts
++++ b/apps/desktop/tests/login-shell-environment.spec.ts
+@@ -95,12 +95,12 @@
+   it('returns the inherited environment on Windows without running a shell', async () => {
+     const base = { Path: 'C:\\Windows' }
+     await expect(readDesktopLoginShellEnvironment(base, config, { platform: 'win32', shells: [shell('unused', 'exit 1')] }))
+-      .resolves.toEqual({ environment: base, failures: [] })
++      .resolves.toEqual({ environment: { ...base, LC_MESSAGES: 'C' }, failures: [] })
+   })
+ 
+   it('records a candidate whose path cannot be passed to spawn', async () => {
+     await expect(readDesktopLoginShellEnvironment({}, config, { platform: 'linux', shells: ['/bin/sh\0'] })).resolves.toEqual({
+-      environment: {}, failures: [{ shell: '/bin/sh\0', reason: expect.stringContaining('null bytes') as string }],
++      environment: { LC_MESSAGES: 'C' }, failures: [{ shell: '/bin/sh\0', reason: expect.stringContaining('null bytes') as string }],
+     })
+   })
+ 
+@@ -108,7 +108,7 @@
+     const base = { PATH: '/usr/bin' }
+     const signal = AbortSignal.abort()
+     await expect(readDesktopLoginShellEnvironment(base, config, { platform: 'darwin', shells: ['/a', '/b'], signal })).resolves
+-      .toEqual({ environment: base, failures: [{ shell: '/a', reason: 'aborted' }] })
++      .toEqual({ environment: { ...base, LC_MESSAGES: 'C' }, failures: [{ shell: '/a', reason: 'aborted' }] })
+   })
+ })
+ 
+@@ -128,6 +128,13 @@
+     expect(result.environment).not.toHaveProperty('DISABLE_AUTO_UPDATE')
+   })
+ 
++  it('pins the message locale even when the login shell exports another one', async () => {
++    const login = shell('locale', 'export LC_MESSAGES=zh_CN.UTF-8')
++    const result = await readDesktopLoginShellEnvironment({ LC_MESSAGES: 'zh_CN.UTF-8' }, config, { platform: 'darwin', shells: [login] })
++    expect(result.failures).toEqual([])
++    expect(result.environment.LC_MESSAGES).toBe('C')
++  })
++
+   it('records each failing candidate and uses the next one', async () => {
+     const candidates = [
+       join(directory, 'missing'),

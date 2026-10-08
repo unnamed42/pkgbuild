@@ -6,7 +6,8 @@
 # (wayland app id, native menus, DOM shortcut dispatch, non-portal folder dialogs);
 # only the target wiring, the release settings for an unsigned build, the two
 # Linux-only runtime adjustments in linux-desktop.patch, the Linux system tray in
-# tray-linux.patch, the serial release packing that pack-speed.patch parallelises, and the
+# tray-linux.patch, the serial release packing that pack-speed.patch parallelises, the
+# message-locale pin that desktop-message-locale.patch adds to the Host environment, and the
 # Electron 44.0.0 tray regression that electron-tray-fix.patch steps around were missing.
 # The installed
 # result is the same shape as the macOS and Windows releases: the Electron shell plus
@@ -29,7 +30,7 @@
 pkgname=deepseek-harness-desktop
 _tag=dsh-v0.2.1-alpha.1
 pkgver=0.2.1alpha.1
-pkgrel=1
+pkgrel=2
 pkgdesc='DeepSeek Harness desktop application (Electron shell and bundled dsh runtime)'
 arch=('x86_64')
 url='https://github.com/deepseek-ai/deepseek-harness'
@@ -52,6 +53,7 @@ source=(
   'tray-linux.patch'
   'pack-speed.patch'
   'electron-tray-fix.patch'
+  'desktop-message-locale.patch'
 )
 sha256sums=(
   'SKIP'
@@ -60,6 +62,7 @@ sha256sums=(
   '05592cb1eedce25bf77a4eca046dfd2a0362f0373ca2f1dc568deeba40d40dbd'
   'dd85b8c905805481c86f1675d093e074dd406d3c8de7877a7c5698501e1585c3'
   '0c1f7cb192af30107d1e7090c23f5616914cdc20b32ad6dbc85a2624c6d8c7df'
+  '92a1ccdf898e28ae66713bb6c4f1ed3ef8daa435845535a813b371b05b519d65'
 )
 
 prepare() {
@@ -86,6 +89,12 @@ prepare() {
   # Electron 44.0.0 registers its StatusNotifierItem under a name the desktop's watcher
   # cannot resolve, so the tray never appears; 44.1.0 carries the upstream fix.
   patch -Np1 --no-backup-if-mismatch -i "$srcdir/electron-tray-fix.patch"
+
+  # The Host environment is the parent of every tool command, and DSH tells a sandbox
+  # denial apart from an ordinary command failure by matching English kernel strings in a
+  # child's stderr. A translated message locale hides every denial from the model, so pin
+  # the message catalogue here rather than depending on how the user launched the app.
+  patch -Np1 --no-backup-if-mismatch -i "$srcdir/desktop-message-locale.patch"
 
   # The Linux target reads its release settings from a dotenv file beside the app.
   install -Dm644 "$srcdir/deepseek-harness-linux.env" apps/desktop/.env.linux
