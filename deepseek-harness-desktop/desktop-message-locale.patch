@@ -105,3 +105,21 @@
    it('records each failing candidate and uses the next one', async () => {
      const candidates = [
        join(directory, 'missing'),
+@@ -162,7 +169,7 @@
+     const hanging = shell('hanging', `sleep 30 & echo $! > '${pidFile}'; wait`)
+     const base = { PATH: '/usr/bin:/bin' }
+     const result = await readDesktopLoginShellEnvironment(base, { timeoutMs: 2_000 }, { platform: 'darwin', shells: [hanging] })
+-    expect(result).toEqual({ environment: base, failures: [{ shell: hanging, reason: 'timeout' }] })
++    expect(result).toEqual({ environment: { ...base, LC_MESSAGES: 'C' }, failures: [{ shell: hanging, reason: 'timeout' }] })
+     const child = Number(readFileSync(pidFile, 'utf8'))
+     await vi.waitFor(() => { expect(exited(child)).toBe(true) })
+   })
+@@ -181,7 +188,7 @@
+       return pid
+     })
+     controller.abort()
+-    await expect(read).resolves.toEqual({ environment: base, failures: [{ shell: hanging, reason: 'aborted' }] })
++    await expect(read).resolves.toEqual({ environment: { ...base, LC_MESSAGES: 'C' }, failures: [{ shell: hanging, reason: 'aborted' }] })
+     await vi.waitFor(() => { expect(exited(child)).toBe(true) })
+   })
+ })

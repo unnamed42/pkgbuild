@@ -8,7 +8,7 @@
  import { parseArgs } from 'node:util'
  import { join, resolve } from 'node:path'
  import {
-@@ -425,7 +426,11 @@
+@@ -432,7 +433,11 @@
    const journal = target.platform === 'darwin' ? process.env.DSH_DESKTOP_PACKAGING_RUN_DIR : undefined
    const proxyEvent = (status: string) => { if (journal) recordPackagingEvent(journal, { type: 'notarization-proxy', status }) }
    const mac = target.platform === 'darwin' ? resolveMacOSPackageSettings(environment) : undefined

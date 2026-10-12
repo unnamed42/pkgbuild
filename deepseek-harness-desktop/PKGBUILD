@@ -28,9 +28,9 @@
 # them at runtime -- the application locates every file relative to its own directory.
 
 pkgname=deepseek-harness-desktop
-_tag=dsh-v0.2.1-alpha.1
-pkgver=0.2.1alpha.1
-pkgrel=2
+_tag=dsh-v0.2.1-alpha.2
+pkgver=0.2.1alpha.2
+pkgrel=1
 pkgdesc='DeepSeek Harness desktop application (Electron shell and bundled dsh runtime)'
 arch=('x86_64')
 url='https://github.com/deepseek-ai/deepseek-harness'
@@ -57,12 +57,12 @@ source=(
 )
 sha256sums=(
   'SKIP'
-  '4bfd3c3abe254ade24cb7255a2a118533afc7587443086a0cad93a15256d94b2'
+  'da4f9101d9033fa842fa40e0aa76965ffd8ffb28a4bb1998e13b9d07126ac654'
   'c9783ffd57bf481f89ec59beb6047c7cf40098e4790c6098bf60370c408a4c7d'
-  '05592cb1eedce25bf77a4eca046dfd2a0362f0373ca2f1dc568deeba40d40dbd'
-  'dd85b8c905805481c86f1675d093e074dd406d3c8de7877a7c5698501e1585c3'
-  '0c1f7cb192af30107d1e7090c23f5616914cdc20b32ad6dbc85a2624c6d8c7df'
-  '92a1ccdf898e28ae66713bb6c4f1ed3ef8daa435845535a813b371b05b519d65'
+  '75d742a87e5d450e0f4e0ca11ced22b98e82380481fc48ccd76af9e565eead37'
+  '503628ec2a0699d91c91d64502931a70fc5dc831f772558f574602bae4150d62'
+  'ed5f877ee06f74cae620ca82e68219b543e5f572bba270e340a79ccaed0db925'
+  'aefede4e1c7c03c0f92847b145460393aa4a584fb3b8890e935dab3b70c16f19'
 )
 
 prepare() {
@@ -126,8 +126,32 @@ build() {
   # Electron that also carries the tray fix.
   export DSH_DESKTOP_ELECTRON_VERSION=43.0.0
 
+  # The Electron archive and the SHASUMS256.txt @electron/get checks it against both come from
+  # GitHub's release CDN, and that checksum file is fetched on every run, so a cached archive
+  # does not help while github.com is unreachable: the connection itself times out. npmmirror
+  # mirrors the release verbatim, checksum file included, and @electron/get still verifies the
+  # archive against it. Set ELECTRON_MIRROR to the GitHub release base to fetch from there.
+  export ELECTRON_MIRROR="${ELECTRON_MIRROR:-https://registry.npmmirror.com/-/binary/electron/}"
+
   # The repository pins its own pnpm through packageManager; the system package bootstraps it.
   pnpm install --frozen-lockfile
+
+  # makepkg reuses the working copy across tags and git ignores generated output, so a re-run
+  # at a new tag keeps the previous tag's `lib/` trees; the bundle step discovers workspace
+  # members by directory and then fails on the packages the new tag renamed or deleted.
+  # The repository's own cleaner removes that output, and it also removes
+  # apps/desktop/.desktop-build, which holds the pinned upstream downloads; keep that cache.
+  local downloads
+  if [[ -d apps/desktop/.desktop-build/downloads ]]; then
+    downloads=$(mktemp -d)
+    mv apps/desktop/.desktop-build/downloads "$downloads/downloads"
+  fi
+  pnpm run clean
+  if [[ -n ${downloads:-} ]]; then
+    install -d apps/desktop/.desktop-build
+    mv "$downloads/downloads" apps/desktop/.desktop-build/downloads
+    rmdir "$downloads"
+  fi
 
   # Assemble the unpacked application: the Electron shell, the dsh runtime with its
   # production dependency closure, and the bundled Node.js/pnpm/CPython payload. The

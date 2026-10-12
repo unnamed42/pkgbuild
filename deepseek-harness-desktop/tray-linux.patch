@@ -1,6 +1,6 @@
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
-@@ -993,8 +993,13 @@
+@@ -997,8 +997,13 @@
      tray?.relabel()
    }
    refreshApplicationMenu()
@@ -37,7 +37,7 @@
    /** Show and focus the primary window. */
 --- a/apps/desktop/tests/main-startup.spec.ts
 +++ b/apps/desktop/tests/main-startup.spec.ts
-@@ -1148,6 +1148,26 @@
+@@ -1280,6 +1280,26 @@
      expect(harness.trays[0]!.setContextMenu.mock.calls.length).toBe(relabels + 1)
    })
  

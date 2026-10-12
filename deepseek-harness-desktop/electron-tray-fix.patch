@@ -1,8 +1,8 @@
 --- a/apps/desktop/scripts/prepare-runtime.ts
 +++ b/apps/desktop/scripts/prepare-runtime.ts
-@@ -34,7 +34,10 @@
-   const { platform } = desktopTargetPlatform(target)
-   const arch = target.endsWith('arm64') ? 'arm64' : 'x64'
+@@ -22,7 +22,10 @@
+ /** Extract the target Electron distribution and return its embedded Node version. */
+ async function prepareElectron({ platform, arch }: DesktopTarget): Promise<string> {
    const require = createRequire(import.meta.url)
 -  const { version } = require('electron/package.json') as { version: string }
 +  // electron-builder packages exactly this directory, so the binary that ships is chosen here and not
