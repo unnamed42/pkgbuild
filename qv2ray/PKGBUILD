@@ -1,0 +1,55 @@
+# Maintainer: Neboer <rubinposter at gmail dot com>
+# Contributor: DuckSoft <realducksoft at gmail dot com>
+# Contributor: ArielAxionL <i at axionl dot me>
+# Contributor: Leroy.H.Y <me at lhy0403 dot top>
+pkgname=qv2ray
+pkgver=2.8.0
+pkgrel=1
+pkgdesc="Cross-platform V2ray Client written in Qt (Stable Release)"
+arch=('x86_64')
+url='https://github.com/unnamed42/Qv2ray'
+license=('GPL-3.0-or-later')
+depends=('hicolor-icon-theme' 'qt6-base' 'qt6-svg')
+optdepends=('v2ray: use system v2ray core.' 'grpc: enable api backend')
+makedepends=('git' 'make' 'qt5-tools' 'which' 'gcc' 'qt6-declarative'
+             'grpc-cli' 'cmake' 'ninja')
+provides=('qv2ray')
+conflicts=('qv2ray')
+
+source=('Qv2ray::git+https://github.com/unnamed42/Qv2ray')
+
+sha512sums=('SKIP')
+
+pkgver() {
+    printf "%s" $(cat ${srcdir}/Qv2ray/makespec/VERSION)
+}
+
+prepare() {
+    cd "${srcdir}/Qv2ray"
+    git submodule update --recursive --init
+}
+
+build() {
+    export _QV2RAY_BUILD_INFO_="Qv2ray from AUR"
+    export _QV2RAY_BUILD_EXTRA_INFO_="(Manual Build) $(uname -a | cut -d " " -f3,13)"
+
+    cd "${srcdir}/Qv2ray"
+    mkdir -p build && cd build
+    cmake .. \
+        -DCMAKE_INSTALL_PREFIX=${pkgdir}/usr \
+        -DQV2RAY_ZXING_PROVIDER="module" \
+        -DQV2RAY_TRANSLATION_PATH="/usr/share/qv2ray/lang" \
+        -DQV2RAY_DEFAULT_VASSETS_PATH="/usr/share/v2ray" \
+        -DQV2RAY_DEFAULT_VCORE_PATH="/usr/bin/v2ray" \
+        -DQV2RAY_DISABLE_AUTO_UPDATE=on \
+        -DQV2RAY_USE_V5_CORE=off \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_CXX_COMPILER=g++ \
+        -GNinja
+    ninja
+}
+
+package() {
+    cd "${srcdir}/Qv2ray"
+    ninja -C "build" install
+}
