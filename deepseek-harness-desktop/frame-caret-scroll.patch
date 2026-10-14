@@ -1,0 +1,104 @@
+diff --git a/apps/web/tests/frame-caret-scroll.e2e.ts b/apps/web/tests/frame-caret-scroll.e2e.ts
+new file mode 100644
+index 0000000000..a40ea3329f
+--- /dev/null
++++ b/apps/web/tests/frame-caret-scroll.e2e.ts
+@@ -0,0 +1,77 @@
++// The shell frame never scrolls. A collapsed right panel keeps its width and
++// slides off the frame's right edge, so the frame always carries a scrollable
++// overflow wider than itself; revealing a composer caret that moved (PageUp /
++// PageDown) must not consume it and drag the whole shell sideways.
++import { chromium, type Page } from 'playwright'
++import { expect, it } from 'vitest'
++import { launchWebScaffold, watchConsole } from './scaffold.ts'
++import { connectFreshWorkspace, newEnglishPage, saveFailureShot, writeComposerDraft } from './support.ts'
++
++const DRAFT = 'alpha beta gamma'
++
++/** Caret offset plus the geometry a sideways scroll would move. */
++function readShell(page: Page) {
++  return page.evaluate(() => {
++    const box = (element: Element) => {
++      const rect = element.getBoundingClientRect()
++      return { left: rect.left, right: rect.right, width: rect.width }
++    }
++    // The frame is the right column's own grid container, the same anchor the
++    // layout geometry scenario uses for the centre column.
++    const frame = document.querySelector<HTMLElement>('[data-rightbar-col]')!.parentElement!
++    const selection = window.getSelection()
++    return {
++      frameScrollLeft: frame.scrollLeft,
++      composer: box(document.querySelector('[data-composer-input]')!),
++      panel: box(document.querySelector('[data-sidebar-right-panel]')!),
++      caretOffset: selection === null ? null : selection.focusOffset,
++    }
++  })
++}
++
++it('leaves the shell still when a page key moves the composer caret past a collapsed right panel', async () => {
++  const scaffold = await launchWebScaffold({})
++  const browser = await chromium.launch()
++  let failurePage: Page | undefined
++  try {
++    const page = await newEnglishPage(browser)
++    failurePage = page
++    const tripwire = watchConsole(page)
++    await page.goto(scaffold.authenticatedUrl)
++    await connectFreshWorkspace(page, scaffold.workspaceCwd, 'frame-caret-scroll')
++
++    // Open the panel once so it carries a width, then collapse it: the panel
++    // stays mounted at that width and slides off the frame's right edge.
++    await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
++    await page.locator('[data-sidebar-right-guide-entry="files"]').click()
++    await page.locator('[data-sidebar-right-panel][data-sidebar-right-open]').waitFor()
++    await page.locator('[data-sidebar-right-toggle]').click()
++    await expect.poll(() => page.locator('[data-sidebar-right-panel][data-sidebar-right-open]').count()).toBe(0)
++    await page.waitForTimeout(500)
++
++    const input = page.locator('[data-composer-input][contenteditable="true"]').first()
++    await writeComposerDraft(page, input, DRAFT)
++    const atEnd = await readShell(page)
++    expect(atEnd.caretOffset).toBe(DRAFT.length)
++
++    // PageUp moves the caret to the line head; the caret must move, and the
++    // shell must not: the frame stays at its own origin and every box the user
++    // sees keeps its place.
++    await input.press('PageUp')
++    const afterPageUp = await readShell(page)
++    expect(afterPageUp.caretOffset).toBe(0)
++    expect(afterPageUp).toEqual({ ...atEnd, caretOffset: 0 })
++
++    // PageDown returns the caret to the end, from the frame's still-current origin.
++    await input.press('PageDown')
++    expect(await readShell(page)).toEqual(atEnd)
++    expect(tripwire.pageErrors).toEqual([])
++    expect(tripwire.warnings).toEqual([])
++  } catch (error) {
++    if (failurePage !== undefined) await saveFailureShot(failurePage, 'web-e2e-frame-caret-scroll')
++    throw error
++  } finally {
++    await browser.close()
++    await scaffold.close()
++  }
++})
+diff --git a/packages/client/ui-layout/src/client/AppFrame.module.css b/packages/client/ui-layout/src/client/AppFrame.module.css
+index 5b71ebecfd..59d0cc0cb3 100644
+--- a/packages/client/ui-layout/src/client/AppFrame.module.css
++++ b/packages/client/ui-layout/src/client/AppFrame.module.css
+@@ -3,7 +3,15 @@
+   display: grid;
+   grid-template-rows: minmax(0, 1fr) auto;
+   height: 100%;
+-  overflow: hidden;
++  /* `clip`, not `hidden`. A collapsed right panel keeps its width and slides
++     off the frame's right edge (ui-sidebar-right), so the frame always carries
++     a scrollable overflow wider than its own box. Hidden overflow still makes
++     the frame a scroll container, and the reveal of a caret that moved inside
++     the composer (PageUp/PageDown) scrolls it like any other: the whole shell
++     shifts left by the caret's offset and a blank band the panel's width opens
++     along the right edge. The frame is a fixed shell that never scrolls, so it
++     clips its overflow without becoming a scroller. */
++  overflow: clip;
+   background: var(--dsw-alias-bg-base);
+ }
+ 
