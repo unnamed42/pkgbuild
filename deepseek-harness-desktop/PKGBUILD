@@ -12,7 +12,9 @@
 # frame-caret-scroll.patch is not packaging work: it fixes a shell bug this tag ships, where a
 # collapsed right sidebar leaves the frame's column grid a scroll container and PageUp or PageDown
 # in the composer scrolls that grid sideways, opening a blank band along the right edge; the patch
-# adds the browser regression test for it alongside the fix.
+# adds the browser regression test for it alongside the fix and registers that test the way this
+# repository registers every host-face e2e file -- in tsconfig.host.json's include and in the
+# client project's exclusions (apps/web/tsconfig.json), which the client typecheck requires.
 # The installed
 # result is the same shape as the macOS and Windows releases: the Electron shell plus
 # a complete dsh runtime, with Node.js, pnpm, CPython and the Office libraries
@@ -32,9 +34,9 @@
 # them at runtime -- the application locates every file relative to its own directory.
 
 pkgname=deepseek-harness-desktop
-_tag=dsh-v0.2.1-alpha.2
-pkgver=0.2.1alpha.2
-pkgrel=2
+_tag=dsh-v0.2.1-alpha.3
+pkgver=0.2.1alpha.3
+pkgrel=1
 pkgdesc='DeepSeek Harness desktop application (Electron shell and bundled dsh runtime)'
 arch=('x86_64')
 url='https://github.com/deepseek-ai/deepseek-harness'
@@ -62,13 +64,13 @@ source=(
 )
 sha256sums=(
   'SKIP'
-  'da4f9101d9033fa842fa40e0aa76965ffd8ffb28a4bb1998e13b9d07126ac654'
+  '7b5be0aaf0a4cc5dab29fc49b00d1e96c7ef338de272c45400881110a366545a'
   'c9783ffd57bf481f89ec59beb6047c7cf40098e4790c6098bf60370c408a4c7d'
   '75d742a87e5d450e0f4e0ca11ced22b98e82380481fc48ccd76af9e565eead37'
   '503628ec2a0699d91c91d64502931a70fc5dc831f772558f574602bae4150d62'
   'ed5f877ee06f74cae620ca82e68219b543e5f572bba270e340a79ccaed0db925'
   'aefede4e1c7c03c0f92847b145460393aa4a584fb3b8890e935dab3b70c16f19'
-  '6671fdd7c4b69c584c710c909652d7d3cd40ddf1a07eaa2657643bee49763eaf'
+  '75cd0a669ffc13bce9a8009f379071fbac6febbacfcfcb369c09f35bf335f338'
 )
 
 prepare() {

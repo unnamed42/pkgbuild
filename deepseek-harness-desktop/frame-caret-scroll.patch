@@ -81,6 +81,20 @@ index 0000000000..a40ea3329f
 +    await scaffold.close()
 +  }
 +})
+diff --git a/apps/web/tsconfig.json b/apps/web/tsconfig.json
+index 7c03df4930..bebf826926 100644
+--- a/apps/web/tsconfig.json
++++ b/apps/web/tsconfig.json
+@@ -198,7 +198,8 @@
+     "tests/window-drag-coverage.e2e.ts",
+     "tests/complex-history.perf.ts",
+     "tests/pwsh-terminal.e2e.ts",
+-    "tests/workflow-run.e2e.ts"
++    "tests/workflow-run.e2e.ts",
++    "tests/frame-caret-scroll.e2e.ts"
+   ],
+   "references": [
+     { "path": "../../packages/experimental/auto-review" },
 diff --git a/packages/client/ui-layout/src/client/AppFrame.module.css b/packages/client/ui-layout/src/client/AppFrame.module.css
 index 5b71ebecfd..59d0cc0cb3 100644
 --- a/packages/client/ui-layout/src/client/AppFrame.module.css
@@ -102,3 +116,15 @@ index 5b71ebecfd..59d0cc0cb3 100644
    background: var(--dsw-alias-bg-base);
  }
  
+diff --git a/tsconfig.host.json b/tsconfig.host.json
+index af38cdb341..99bb5829db 100644
+--- a/tsconfig.host.json
++++ b/tsconfig.host.json
+@@ -188,6 +188,7 @@
+     "apps/web/tests/complex-history.perf.ts",
+     "apps/web/tests/pwsh-terminal.e2e.ts",
+     "apps/web/tests/workflow-run.e2e.ts",
++    "apps/web/tests/frame-caret-scroll.e2e.ts",
+     "apps/web/stress-tests/reasoning-chunks.stress.ts",
+     "apps/cli/tests/**/*.ts",
+     "apps/desktop/scripts/**/*.ts",
