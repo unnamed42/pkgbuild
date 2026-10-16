@@ -9,12 +9,6 @@
 # tray-linux.patch, the serial release packing that pack-speed.patch parallelises, the
 # message-locale pin that desktop-message-locale.patch adds to the Host environment, and the
 # Electron 44.0.0 tray regression that electron-tray-fix.patch steps around were missing.
-# frame-caret-scroll.patch is not packaging work: it fixes a shell bug this tag ships, where a
-# collapsed right sidebar leaves the frame's column grid a scroll container and PageUp or PageDown
-# in the composer scrolls that grid sideways, opening a blank band along the right edge; the patch
-# adds the browser regression test for it alongside the fix and registers that test the way this
-# repository registers every host-face e2e file -- in tsconfig.host.json's include and in the
-# client project's exclusions (apps/web/tsconfig.json), which the client typecheck requires.
 # The installed
 # result is the same shape as the macOS and Windows releases: the Electron shell plus
 # a complete dsh runtime, with Node.js, pnpm, CPython and the Office libraries
@@ -34,8 +28,8 @@
 # them at runtime -- the application locates every file relative to its own directory.
 
 pkgname=deepseek-harness-desktop
-_tag=dsh-v0.2.1-alpha.4
-pkgver=0.2.1alpha.4
+_tag=dsh-v0.2.1-alpha.5
+pkgver=0.2.1alpha.5
 pkgrel=1
 pkgdesc='DeepSeek Harness desktop application (Electron shell and bundled dsh runtime)'
 arch=('x86_64')
@@ -60,7 +54,6 @@ source=(
   'pack-speed.patch'
   'electron-tray-fix.patch'
   'desktop-message-locale.patch'
-  'frame-caret-scroll.patch'
 )
 sha256sums=(
   'SKIP'
@@ -70,7 +63,6 @@ sha256sums=(
   '503628ec2a0699d91c91d64502931a70fc5dc831f772558f574602bae4150d62'
   'ed5f877ee06f74cae620ca82e68219b543e5f572bba270e340a79ccaed0db925'
   'aefede4e1c7c03c0f92847b145460393aa4a584fb3b8890e935dab3b70c16f19'
-  '75cd0a669ffc13bce9a8009f379071fbac6febbacfcfcb369c09f35bf335f338'
 )
 
 prepare() {
@@ -80,7 +72,7 @@ prepare() {
   # restore the tracked files and drop the files the patches add, so the patches below
   # always apply to a clean tree.
   git checkout -- .
-  rm -f apps/desktop/scripts/linux-runtime-adjustments.ts apps/web/tests/frame-caret-scroll.e2e.ts
+  rm -f apps/desktop/scripts/linux-runtime-adjustments.ts
 
   # Linux desktop target, unsigned release settings, and the Electron-safe sharp
   # build plus the LibreOfficeKit engine probe fix the ASAR layout needs.
@@ -103,13 +95,6 @@ prepare() {
   # child's stderr. A translated message locale hides every denial from the model, so pin
   # the message catalogue here rather than depending on how the user launched the app.
   patch -Np1 --no-backup-if-mismatch -i "$srcdir/desktop-message-locale.patch"
-
-  # The shell's column grid clips its overflowing right panel with `overflow: hidden`,
-  # which still leaves the frame a scroll container: PageUp or PageDown in the composer
-  # moves the caret, the browser reveals it, and the frame scrolls sideways by the caret's
-  # offset -- the shell jumps left and a blank band the collapsed panel's width opens along
-  # the right edge. Clipping without scrolling is the fix; drop this patch once it is upstream.
-  patch -Np1 --no-backup-if-mismatch -i "$srcdir/frame-caret-scroll.patch"
 
   # The Linux target reads its release settings from a dotenv file beside the app.
   install -Dm644 "$srcdir/deepseek-harness-linux.env" apps/desktop/.env.linux
