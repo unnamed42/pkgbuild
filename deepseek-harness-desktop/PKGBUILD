@@ -28,8 +28,8 @@
 # them at runtime -- the application locates every file relative to its own directory.
 
 pkgname=deepseek-harness-desktop
-_tag=dsh-v0.2.1-alpha.5
-pkgver=0.2.1alpha.5
+_tag=dsh-v0.2.1-rc.2
+pkgver=0.2.1rc.2
 pkgrel=1
 pkgdesc='DeepSeek Harness desktop application (Electron shell and bundled dsh runtime)'
 arch=('x86_64')
@@ -116,15 +116,15 @@ build() {
   # Electron binary for a working Linux tray. electron-builder packages the directory
   # prepare-runtime.ts downloads, so this picks the binary without touching the lockfile.
   # The runtime's prebuilt native addon (node-addon-require-builtin) accepts only the exact
-  # fingerprints 43.0.0, 44.0.0 and 45.0.0-alpha.6, and 44.0.0 is the release whose
-  # StatusNotifierItem registration the desktop shell's tray cannot use; 44.5.1, which carries
-  # the upstream fix, is refused and fails prepare:dsh. 43.0.0 is the newest allowed version
-  # that predates the regression, and it was verified here: the shell starts on it and its tray
+  # fingerprints 43.0.0, 44.0.0, 44.7.0 and 45.0.0-alpha.6, and 44.0.0 is the release whose
+  # StatusNotifierItem registration the desktop shell's tray cannot use; 44.7.0, which carries
+  # the upstream fix (the exact fix is in version 44.5.1), is accepted. 43.0.0 is the old but allowed
+  # version that predates the regression, and it was verified here: the shell starts on it and its tray
   # item registers with org.kde.StatusNotifierWatcher (:1.xxxx/org/chromium/StatusNotifierItem/1).
   # Upstream publishes no Linux desktop release, so this pin is ours to carry: drop it once the
   # runtime's addon (deepseek-ai/dsh-node-addon-require-builtin) adds a fingerprint for an
   # Electron that also carries the tray fix.
-  export DSH_DESKTOP_ELECTRON_VERSION=43.0.0
+  export DSH_DESKTOP_ELECTRON_VERSION=44.7.0
 
   # The Electron archive and the SHASUMS256.txt @electron/get checks it against both come from
   # GitHub's release CDN, and that checksum file is fetched on every run, so a cached archive
