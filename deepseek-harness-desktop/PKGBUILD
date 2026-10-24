@@ -28,8 +28,8 @@
 # them at runtime -- the application locates every file relative to its own directory.
 
 pkgname=deepseek-harness-desktop
-_tag=dsh-v0.2.1-rc.2
-pkgver=0.2.1rc.2
+_tag=dsh-v0.2.1-rc.3
+pkgver=0.2.1rc.3
 pkgrel=1
 pkgdesc='DeepSeek Harness desktop application (Electron shell and bundled dsh runtime)'
 arch=('x86_64')
