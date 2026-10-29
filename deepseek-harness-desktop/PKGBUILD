@@ -4,11 +4,13 @@
 # Upstream publishes desktop releases for macOS and Windows only, although the
 # sources already contain the packaging target and the shell's Linux behaviour
 # (wayland app id, native menus, DOM shortcut dispatch, non-portal folder dialogs);
-# only the target wiring, the release settings for an unsigned build, the two
-# Linux-only runtime adjustments in linux-desktop.patch, the Linux system tray in
-# tray-linux.patch, the serial release packing that pack-speed.patch parallelises, the
-# message-locale pin that desktop-message-locale.patch adds to the Host environment, and the
-# Electron 44.0.0 tray regression that electron-tray-fix.patch steps around were missing.
+# only the target wiring, the release settings for an unsigned build, the Linux system
+# tray and the two Linux-only runtime adjustments in linux-desktop.patch, the message-locale
+# pin that desktop-message-locale.patch adds to the Host environment, and the Electron
+# 44.0.0 tray regression that electron-tray-fix.patch steps around were missing.
+# The serial release packing this package used to parallelise needs no patch since
+# 0.2.2-alpha.2: upstream passes `--concurrency` for every non-macOS target, so a Linux
+# target packs four members at a time instead of one.
 # The installed
 # result is the same shape as the macOS and Windows releases: the Electron shell plus
 # a complete dsh runtime, with Node.js, pnpm, CPython and the Office libraries
@@ -28,8 +30,8 @@
 # them at runtime -- the application locates every file relative to its own directory.
 
 pkgname=deepseek-harness-desktop
-_tag=dsh-v0.2.1-rc.3
-pkgver=0.2.1rc.3
+_tag=dsh-v0.2.2-alpha.2
+pkgver=0.2.2alpha.2
 pkgrel=1
 pkgdesc='DeepSeek Harness desktop application (Electron shell and bundled dsh runtime)'
 arch=('x86_64')
@@ -50,17 +52,13 @@ source=(
   "$pkgname::git+https://github.com/deepseek-ai/deepseek-harness.git#tag=$_tag"
   'linux-desktop.patch'
   'deepseek-harness-linux.env'
-  'tray-linux.patch'
-  'pack-speed.patch'
   'electron-tray-fix.patch'
   'desktop-message-locale.patch'
 )
 sha256sums=(
   'SKIP'
-  '7b5be0aaf0a4cc5dab29fc49b00d1e96c7ef338de272c45400881110a366545a'
+  '6b2dfd1da9994e961cdb8e45c629b798fd80dc6e8165f598395af8d296c2ef86'
   'c9783ffd57bf481f89ec59beb6047c7cf40098e4790c6098bf60370c408a4c7d'
-  '75d742a87e5d450e0f4e0ca11ced22b98e82380481fc48ccd76af9e565eead37'
-  '503628ec2a0699d91c91d64502931a70fc5dc831f772558f574602bae4150d62'
   'ed5f877ee06f74cae620ca82e68219b543e5f572bba270e340a79ccaed0db925'
   'aefede4e1c7c03c0f92847b145460393aa4a584fb3b8890e935dab3b70c16f19'
 )
@@ -78,13 +76,8 @@ prepare() {
   # build plus the LibreOfficeKit engine probe fix the ASAR layout needs.
   patch -Np1 --no-backup-if-mismatch -i "$srcdir/linux-desktop.patch"
 
-  # The shell already owns the tray; on Linux only the platform gate, the icon path
-  # and its regression test were missing.
-  patch -Np1 --no-backup-if-mismatch -i "$srcdir/tray-linux.patch"
-
-  # The pack step is one pnpm per tarball, and this build packs over three hundred of
-  # them; parallelise it and stop its per-tarball file listing from burying the log.
-  patch -Np1 --no-backup-if-mismatch -i "$srcdir/pack-speed.patch"
+  # The pack step needs no patch here: upstream passes `--concurrency` for every non-macOS
+  # target since 0.2.2-alpha.2, so this build no longer adds the option itself.
 
   # Electron 44.0.0 registers its StatusNotifierItem under a name the desktop's watcher
   # cannot resolve, so the tray never appears; 44.1.0 carries the upstream fix.
