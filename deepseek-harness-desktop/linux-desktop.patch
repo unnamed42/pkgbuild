@@ -1,5 +1,39 @@
+From 341af93ff18e9e90075d7397fb52125af7bd66ef Mon Sep 17 00:00:00 2001
+From: unnamed42 <wenruih.cn@gmail.com>
+Date: Tue, 3 Nov 2026 16:58:43 +0800
+Subject: [PATCH] patch
+
+---
+ .gitignore                                    |   2 +
+ apps/desktop/package.json                     |   2 +
+ .../desktop/scripts/desktop-build-paths.d.mts |  11 +-
+ apps/desktop/scripts/desktop-build-paths.mjs  |  13 +-
+ .../desktop-build-version-discovery.ts        |   9 +-
+ apps/desktop/scripts/desktop-edgeone.ts       |   2 +
+ .../scripts/desktop-package-environment.d.mts |   5 +-
+ .../scripts/desktop-package-environment.mjs   |  18 ++-
+ .../scripts/desktop-toolchain-preflight.ts    |   4 +-
+ apps/desktop/scripts/desktop-upload-plan.ts   |  18 ++-
+ apps/desktop/scripts/dev.ts                   |   8 +-
+ apps/desktop/scripts/development-project.ts   |   4 +-
+ .../scripts/electron-builder-config.mjs       |  17 ++-
+ apps/desktop/scripts/flock-entry.ts           |   8 +-
+ .../scripts/linux-runtime-adjustments.ts      | 136 ++++++++++++++++++
+ apps/desktop/scripts/package-target.ts        |  58 ++++++--
+ apps/desktop/scripts/prepare-dsh.ts           |  15 +-
+ apps/desktop/scripts/prepare-runtime.ts       |   7 +-
+ apps/desktop/scripts/retain-desktop-ci.ts     |   2 +
+ .../desktop/scripts/smoke-packaged-runtime.ts |   9 +-
+ apps/desktop/src/main.ts                      |  25 +++-
+ .../desktop/tests/desktop-build-paths.spec.ts |  12 +-
+ apps/desktop/tests/flock-entry.spec.ts        |  13 +-
+ apps/desktop/tests/package-target.spec.ts     |   4 +-
+ package.json                                  |   2 +
+ 25 files changed, 329 insertions(+), 75 deletions(-)
+ create mode 100644 apps/desktop/scripts/linux-runtime-adjustments.ts
+
 diff --git a/.gitignore b/.gitignore
-index 3cb86ce8..6c9654c2 100644
+index 4d52487a06..43d758a404 100644
 --- a/.gitignore
 +++ b/.gitignore
 @@ -2,6 +2,7 @@ CLAUDE.local.md
@@ -10,13 +44,16 @@ index 3cb86ce8..6c9654c2 100644
  apps/desktop/*.p12
  node_modules/
  lib/
-@@ -47,3 +48,4 @@ worktrees/
+@@ -47,6 +48,7 @@ worktrees/
  .agents/worktrees/
  .typert-*/
  native/system/test/bin/
 +apps/desktop/.desktop-build/
+ 
+ # Generated company-signed CUA release record.
+ /packages/experimental/cua-macos/cua-helper.json
 diff --git a/apps/desktop/package.json b/apps/desktop/package.json
-index 081a90ea..0977b0df 100644
+index 5d4f00ebee..c2c453366f 100644
 --- a/apps/desktop/package.json
 +++ b/apps/desktop/package.json
 @@ -38,6 +38,8 @@
@@ -29,7 +66,7 @@ index 081a90ea..0977b0df 100644
      "upload:mac:x64": "tsx scripts/upload-target.ts mac-x64",
      "upload:win:x64": "tsx scripts/upload-target.ts win-x64",
 diff --git a/apps/desktop/scripts/desktop-build-paths.d.mts b/apps/desktop/scripts/desktop-build-paths.d.mts
-index 910f3032..b2fc5512 100644
+index 910f3032ee..b2fc551229 100644
 --- a/apps/desktop/scripts/desktop-build-paths.d.mts
 +++ b/apps/desktop/scripts/desktop-build-paths.d.mts
 @@ -1,5 +1,8 @@
@@ -71,7 +108,7 @@ index 910f3032..b2fc5512 100644
  }
  
 diff --git a/apps/desktop/scripts/desktop-build-paths.mjs b/apps/desktop/scripts/desktop-build-paths.mjs
-index edfd9cdf..86077edc 100644
+index edfd9cdf78..86077edc89 100644
 --- a/apps/desktop/scripts/desktop-build-paths.mjs
 +++ b/apps/desktop/scripts/desktop-build-paths.mjs
 @@ -4,14 +4,14 @@ import { isAbsolute, join, resolve } from 'node:path'
@@ -129,7 +166,7 @@ index edfd9cdf..86077edc 100644
    return targets[target]
  }
 diff --git a/apps/desktop/scripts/desktop-build-version-discovery.ts b/apps/desktop/scripts/desktop-build-version-discovery.ts
-index 68291ca3..1855d8f8 100644
+index 68291ca3b8..1855d8f80a 100644
 --- a/apps/desktop/scripts/desktop-build-version-discovery.ts
 +++ b/apps/desktop/scripts/desktop-build-version-discovery.ts
 @@ -31,7 +31,10 @@ const LISTING_DEADLINE_MS = 8_000
@@ -157,7 +194,7 @@ index 68291ca3..1855d8f8 100644
      && options.environment.DOWNLOAD_TEST_ORIGIN === undefined) return undefined
    const update = resolveDesktopUploadConfig(options.environment, platform, arch)
 diff --git a/apps/desktop/scripts/desktop-edgeone.ts b/apps/desktop/scripts/desktop-edgeone.ts
-index e2faf122..37b9f1c8 100644
+index e2faf122a0..37b9f1c814 100644
 --- a/apps/desktop/scripts/desktop-edgeone.ts
 +++ b/apps/desktop/scripts/desktop-edgeone.ts
 @@ -25,6 +25,8 @@ export type DesktopPurgeClient = Pick<InstanceType<typeof teo.v20220901.Client>,
@@ -170,7 +207,7 @@ index e2faf122..37b9f1c8 100644
    const { platform, arch } = desktopTargetPlatform(target)
    const update = resolveDesktopUploadConfig(env, platform, arch)
 diff --git a/apps/desktop/scripts/desktop-package-environment.d.mts b/apps/desktop/scripts/desktop-package-environment.d.mts
-index ec9da721..411a0312 100644
+index ec9da721f1..411a0312a8 100644
 --- a/apps/desktop/scripts/desktop-package-environment.d.mts
 +++ b/apps/desktop/scripts/desktop-package-environment.d.mts
 @@ -13,6 +13,7 @@ export function localMacOSPackageEnvironment(environment?: NodeJS.ProcessEnv): N
@@ -199,7 +236,7 @@ index ec9da721..411a0312 100644
    options?: { unsigned?: boolean, prepareOnly?: boolean, skipNotarization?: boolean },
  ): void
 diff --git a/apps/desktop/scripts/desktop-package-environment.mjs b/apps/desktop/scripts/desktop-package-environment.mjs
-index 27a7f92c..e5da91ba 100644
+index 27a7f92c7f..e5da91ba17 100644
 --- a/apps/desktop/scripts/desktop-package-environment.mjs
 +++ b/apps/desktop/scripts/desktop-package-environment.mjs
 @@ -1,6 +1,6 @@
@@ -258,7 +295,7 @@ index 27a7f92c..e5da91ba 100644
    if (target.platform === 'darwin') resolveMacOSPackageSettings(environment)
    else resolveWindowsPackageSettings(environment)
 diff --git a/apps/desktop/scripts/desktop-toolchain-preflight.ts b/apps/desktop/scripts/desktop-toolchain-preflight.ts
-index ff855cfd..08c8dc1f 100644
+index ff855cfd09..08c8dc1fca 100644
 --- a/apps/desktop/scripts/desktop-toolchain-preflight.ts
 +++ b/apps/desktop/scripts/desktop-toolchain-preflight.ts
 @@ -75,7 +75,7 @@ async function probeWindowsInstallerToolchain(environment: NodeJS.ProcessEnv): P
@@ -280,7 +317,7 @@ index ff855cfd..08c8dc1f 100644
  ): Promise<void> {
    const failures = await probeDesktopToolchain(platform, environment)
 diff --git a/apps/desktop/scripts/desktop-upload-plan.ts b/apps/desktop/scripts/desktop-upload-plan.ts
-index 1461444f..73aebf81 100644
+index 1461444fc6..73aebf81b6 100644
 --- a/apps/desktop/scripts/desktop-upload-plan.ts
 +++ b/apps/desktop/scripts/desktop-upload-plan.ts
 @@ -6,6 +6,7 @@ import { readFile, stat } from 'node:fs/promises'
@@ -328,7 +365,7 @@ index 1461444f..73aebf81 100644
    const repositoryRoot = options.repositoryRoot ?? REPOSITORY_ROOT
    const appRoot = options.appRoot ?? APP_ROOT
 diff --git a/apps/desktop/scripts/dev.ts b/apps/desktop/scripts/dev.ts
-index 37515c20..fef675e4 100644
+index 37515c20b0..fef675e413 100644
 --- a/apps/desktop/scripts/dev.ts
 +++ b/apps/desktop/scripts/dev.ts
 @@ -11,6 +11,7 @@ import { developmentRuntimeDirectory, resolveDesktopBuildTarget } from './deskto
@@ -354,7 +391,7 @@ index 37515c20..fef675e4 100644
  
  async function launchElectron(): Promise<void> {
 diff --git a/apps/desktop/scripts/development-project.ts b/apps/desktop/scripts/development-project.ts
-index d544ce6d..5ceb275d 100644
+index d544ce6d36..5ceb275da3 100644
 --- a/apps/desktop/scripts/development-project.ts
 +++ b/apps/desktop/scripts/development-project.ts
 @@ -16,7 +16,7 @@ import { dirname, join } from 'node:path'
@@ -376,7 +413,7 @@ index d544ce6d..5ceb275d 100644
  
  function readManifest(path: string): PackageManifest {
 diff --git a/apps/desktop/scripts/electron-builder-config.mjs b/apps/desktop/scripts/electron-builder-config.mjs
-index cf0c19e8..a2cb938b 100644
+index cf0c19e895..a2cb938b1a 100644
 --- a/apps/desktop/scripts/electron-builder-config.mjs
 +++ b/apps/desktop/scripts/electron-builder-config.mjs
 @@ -66,7 +66,10 @@ export function createElectronBuilderConfig(
@@ -427,7 +464,7 @@ index cf0c19e8..a2cb938b 100644
      },
      nsis: {
 diff --git a/apps/desktop/scripts/flock-entry.ts b/apps/desktop/scripts/flock-entry.ts
-index 7c2f3e75..1e3d2f12 100644
+index 7c2f3e75da..1e3d2f12fb 100644
 --- a/apps/desktop/scripts/flock-entry.ts
 +++ b/apps/desktop/scripts/flock-entry.ts
 @@ -5,6 +5,7 @@ import { once } from 'node:events'
@@ -457,7 +494,7 @@ index 7c2f3e75..1e3d2f12 100644
    }
 diff --git a/apps/desktop/scripts/linux-runtime-adjustments.ts b/apps/desktop/scripts/linux-runtime-adjustments.ts
 new file mode 100644
-index 00000000..dd49834b
+index 0000000000..dd49834b54
 --- /dev/null
 +++ b/apps/desktop/scripts/linux-runtime-adjustments.ts
 @@ -0,0 +1,136 @@
@@ -598,7 +635,7 @@ index 00000000..dd49834b
 +  writeFileSync(path, source.replace(OFFICE_ENGINE_EXISTENCE_CHECK, OFFICE_ENGINE_EXISTENCE_FIX))
 +}
 diff --git a/apps/desktop/scripts/package-target.ts b/apps/desktop/scripts/package-target.ts
-index b6bc6efb..49bebd49 100644
+index b6bc6efb63..49bebd49b0 100644
 --- a/apps/desktop/scripts/package-target.ts
 +++ b/apps/desktop/scripts/package-target.ts
 @@ -25,6 +25,7 @@ import { suggestDesktopBuildVersion } from './desktop-build-version-discovery.ts
@@ -744,7 +781,7 @@ index b6bc6efb..49bebd49 100644
    }
    if (journal) recordPackagingEvent(journal, { type: 'artifacts', directory: artifactsRoot })
 diff --git a/apps/desktop/scripts/prepare-dsh.ts b/apps/desktop/scripts/prepare-dsh.ts
-index a0698880..10ac3dd9 100644
+index a069888036..10ac3dd9d0 100644
 --- a/apps/desktop/scripts/prepare-dsh.ts
 +++ b/apps/desktop/scripts/prepare-dsh.ts
 @@ -33,6 +33,7 @@ import {
@@ -784,7 +821,7 @@ index a0698880..10ac3dd9 100644
        if (!existsSync(join(DSH_OUTPUT_ROOT, 'node_modules', DESKTOP_HOST_PACKAGE, file))) {
          throw new Error(`desktop runtime: missing private Host file ${file}`)
 diff --git a/apps/desktop/scripts/prepare-runtime.ts b/apps/desktop/scripts/prepare-runtime.ts
-index 4e338532..c5977d4b 100644
+index 4e33853272..c5977d4bea 100644
 --- a/apps/desktop/scripts/prepare-runtime.ts
 +++ b/apps/desktop/scripts/prepare-runtime.ts
 @@ -27,7 +27,8 @@ async function prepareElectron({ platform, arch }: DesktopTarget): Promise<strin
@@ -809,7 +846,7 @@ index 4e338532..c5977d4b 100644
      const minimumVersion = execFileSync('/usr/libexec/PlistBuddy', [
        '-c', 'Print LSMinimumSystemVersion', join(BUILD_PATHS.electron, 'Electron.app', 'Contents', 'Info.plist'),
 diff --git a/apps/desktop/scripts/retain-desktop-ci.ts b/apps/desktop/scripts/retain-desktop-ci.ts
-index 69bade97..90c8da81 100644
+index 69bade9712..90c8da8172 100644
 --- a/apps/desktop/scripts/retain-desktop-ci.ts
 +++ b/apps/desktop/scripts/retain-desktop-ci.ts
 @@ -34,6 +34,8 @@ export function desktopReleasesRoot(env: NodeJS.ProcessEnv): string {
@@ -822,7 +859,7 @@ index 69bade97..90c8da81 100644
    const platform = windows ? 'win32' : 'darwin'
    const settings = loadDesktopPackageEnvironment(platform, env, appRoot, { unsigned: true })
 diff --git a/apps/desktop/scripts/smoke-packaged-runtime.ts b/apps/desktop/scripts/smoke-packaged-runtime.ts
-index 6c3c12c8..0ae20f99 100644
+index 6c3c12c857..0ae20f9956 100644
 --- a/apps/desktop/scripts/smoke-packaged-runtime.ts
 +++ b/apps/desktop/scripts/smoke-packaged-runtime.ts
 @@ -13,9 +13,12 @@ const target = resolveDesktopBuildTarget()
@@ -842,10 +879,10 @@ index 6c3c12c8..0ae20f99 100644
    resolveDesktopPackageTarget(target))
  if (windows && !values.unsigned) await verifyWindowsCode(application)
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
-index 4770fe83..55a0b614 100644
+index d8d0e30c4c..937f67d2f9 100644
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
-@@ -255,6 +255,16 @@ function platformLoginUrl(authorizeUrl: string): string {
+@@ -256,6 +256,16 @@ function platformLoginUrl(authorizeUrl: string): string {
    return url.href
  }
  
@@ -862,7 +899,7 @@ index 4770fe83..55a0b614 100644
  function createWindow(preload: string, show = false, primary = false): BrowserWindow {
    const window = new BrowserWindow({
      width: 1280,
-@@ -278,6 +288,10 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -279,6 +289,10 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
        visualEffectState: 'active' as const,
        backgroundColor: '#00000000',
      } : {}),
@@ -873,7 +910,7 @@ index 4770fe83..55a0b614 100644
      webPreferences: {
        preload,
        nodeIntegration: false,
-@@ -1025,15 +1039,13 @@ async function main(): Promise<void> {
+@@ -1027,15 +1041,13 @@ async function main(): Promise<void> {
      updates.dispose()
    })
  
@@ -890,7 +927,7 @@ index 4770fe83..55a0b614 100644
    })
    // A custom application menu replaces Electron's default menu, so macOS needs
    // its standard menus and application hide commands declared explicitly.
-@@ -1084,8 +1096,11 @@ async function main(): Promise<void> {
+@@ -1089,8 +1101,11 @@ async function main(): Promise<void> {
      tray?.relabel()
    }
    refreshApplicationMenu()
@@ -905,7 +942,7 @@ index 4770fe83..55a0b614 100644
      try {
        tray = new DesktopTray({ iconPath: trayIconPath, locale: currentDesktopLocale,
 diff --git a/apps/desktop/tests/desktop-build-paths.spec.ts b/apps/desktop/tests/desktop-build-paths.spec.ts
-index f9891ebb..929fc4a7 100644
+index f9891ebb9c..929fc4a72b 100644
 --- a/apps/desktop/tests/desktop-build-paths.spec.ts
 +++ b/apps/desktop/tests/desktop-build-paths.spec.ts
 @@ -13,6 +13,7 @@ describe('desktop build paths', () => {
@@ -952,7 +989,7 @@ index f9891ebb..929fc4a7 100644
    })
  })
 diff --git a/apps/desktop/tests/flock-entry.spec.ts b/apps/desktop/tests/flock-entry.spec.ts
-index b7d8315f..dc8fc84d 100644
+index b7d8315f6a..dc8fc84d7e 100644
 --- a/apps/desktop/tests/flock-entry.spec.ts
 +++ b/apps/desktop/tests/flock-entry.spec.ts
 @@ -1,6 +1,6 @@
@@ -987,7 +1024,7 @@ index b7d8315f..dc8fc84d 100644
      `], { stdio: ['ignore', 'pipe', 'pipe'], env: { PATH: process.env.PATH } })
      let stdout = ''
 diff --git a/apps/desktop/tests/package-target.spec.ts b/apps/desktop/tests/package-target.spec.ts
-index ba647d76..86050869 100644
+index ba647d76ac..8605086990 100644
 --- a/apps/desktop/tests/package-target.spec.ts
 +++ b/apps/desktop/tests/package-target.spec.ts
 @@ -26,7 +26,9 @@ describe('desktop package target', () => {
@@ -1002,7 +1039,7 @@ index ba647d76..86050869 100644
      expect(() => resolveDesktopPackageTarget('mac-arm64', 'darwin', 'x64')).toThrow(/Apple Silicon/u)
      expect(() => resolveDesktopPackageTarget('mac-arm64', 'linux', 'arm64')).toThrow(/macOS/u)
 diff --git a/package.json b/package.json
-index 9dccd600..8c2b5137 100644
+index dcf0f5a609..97613487ab 100644
 --- a/package.json
 +++ b/package.json
 @@ -42,6 +42,8 @@
@@ -1014,3 +1051,6 @@ index 9dccd600..8c2b5137 100644
      "upload:mac:arm64": "pnpm --filter @deepseek-ai/dsh-desktop run upload:mac:arm64",
      "upload:mac:x64": "pnpm --filter @deepseek-ai/dsh-desktop run upload:mac:x64",
      "upload:win:x64": "pnpm --filter @deepseek-ai/dsh-desktop run upload:win:x64",
+-- 
+2.56.0
+
