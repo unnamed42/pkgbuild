@@ -1,0 +1,50 @@
+# Maintainer: unnamed42 <wenruih.cn at gmail dot com>
+_reponame=AeroControlCenter
+pkgname=aero-control-center-git
+pkgver=r13.gc4c2c04
+pkgrel=1
+pkgdesc="Linux port of Gigabyte's Control Center"
+arch=('x86_64')
+url='https://github.com/tangalbert919/AeroControlCenter'
+license=('GPL-3.0-or-later')
+depends=('qt6-base')
+optdepends=('gigabyte-laptop-wmi-dkms-git: works best with the kernel driver installed')
+makedepends=('git' 'make' 'gcc' 'qt6-declarative' 'cmake')
+options=('!debug')
+
+source=('AeroControlCenter::git+https://github.com/tangalbert919/AeroControlCenter')
+
+sha512sums=('SKIP')
+
+pkgver() {
+    printf "r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+    cd "${srcdir}/$_reponame"
+}
+
+build() {
+    cd "${srcdir}/$_reponame"
+    mkdir -p build && cd build
+    cmake .. \
+        -Wno-author \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_CXX_COMPILER=g++
+    make
+}
+
+package() {
+    cd "${srcdir}/$_reponame"
+
+    install -d $pkgdir/etc/udev/rules.d
+    install -Dm644 70-keyboard.rules $pkgdir/etc/udev/rules.d/
+
+    make DESTDIR="$pkgdir" -C "build" install
+}
+
+post_install() {
+    echo "Refreshing udev rules..."
+    udevadm control --reload-rules && udevadm trigger
+}
